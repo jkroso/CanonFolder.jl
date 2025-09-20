@@ -1,0 +1,4 @@
+*.toml
+node_modules
+.crush
+zed-modern-icons
