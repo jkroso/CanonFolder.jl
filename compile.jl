@@ -15,6 +15,7 @@ const icon_folder = FSPath(joinpath(@dirname, "zed-modern-icons"))
 const theme = parse(MIME("application/json"), read(icon_folder * "icon_themes/vscode-icons-theme.json"))["themes"][2]
 const folder_icon = parse(MIME("text/html"), read(icon_folder * theme["directory_icons"]["collapsed"]))
 const book_review_icon = parse(MIME("text/html"), read(joinpath(@dirname, "book-review.svg")))
+const draft = parse(MIME("text/html"), read(joinpath(@dirname, "draft.svg")))
 
 fileicon(::Directory) = folder_icon
 fileicon(::File{:review}) = book_review_icon
@@ -83,12 +84,13 @@ function directory(dir::FSPath, children, io, deps)
   rows = flatten([
     (let mime = mime_type(entry)
          complete = iscomplete(entry)
-      [@dom[:div class="cell" class.incomplete=!complete css"> a > span {display: flex; align-items: center}"
-         @dom[:a href=href(path, entry) fileicon(entry.source) entry.source.path.name]],
-       @dom[:div class="cell" class.incomplete=!complete invokelatest(describe, entry)],
-       @dom[:div class="cell" class.incomplete=!complete showsize(entry.source.size)],
-       @dom[:div class="cell" class.incomplete=!complete showdate(entry.btime)],
-       @dom[:div class="cell" class.incomplete=!complete showdate(entry.mtime)],]
+         icon = fileicon(entry.source)
+      [@dom[:div class="cell" css"> a > span {display: flex; align-items: center}"
+         @dom[:a href=href(path, entry) (complete ? icon : draft) entry.source.path.name]],
+       @dom[:div class="cell" invokelatest(describe, entry)],
+       @dom[:div class="cell" showsize(entry.source.size)],
+       @dom[:div class="cell" showdate(entry.btime)],
+       @dom[:div class="cell" showdate(entry.mtime)],]
      end)
    for (path,entry) in deps if !shouldignore(path, ignores)])
   @dom[:div css"""
@@ -109,15 +111,17 @@ function directory(dir::FSPath, children, io, deps)
     .cell
       padding: 12px 20px
       border-bottom: 1px solid rgb(225,225,225)
-      &.incomplete {opacity: 0.5}
+      display: flex
+      align-items: center
     .cell:nth-last-child(-n+5)
       border-bottom: none
     a
       display: inline-flex
+      align-items: center
       color: #2563eb
       text-decoration: none
       font-weight: 500
-      svg {width: 1.5em; margin-right: 1em; flex: none}
+      svg {width: 2em; margin-right: 1em; flex: none}
     a:hover
       text-decoration: underline
     """
