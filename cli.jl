@@ -2,6 +2,7 @@
 using Kip
 @use "github.com/jkroso/URI.jl/FSPath" FSPath FileType RelativePath
 @use "github.com/jkroso/HTTP.jl/server" handle_requests Request Response ["logger" logger]
+@use "github.com/jkroso/JSON.jl/read" parse_json
 @use "github.com/jkroso/SimpleCLI.jl" @cli
 @use "./compile" compile
 @use "./Tar" untar
@@ -9,6 +10,17 @@ using Kip
 @use Sockets: localhost, IPAddr, listen, listenany
 @use AWSS3...
 @use Dates
+
+distribution_id(bucket) = begin
+  r = parse_json(read(`aws cloudfront list-distributions`, String))
+  items = r["DistributionList"]["Items"]
+  i = findfirst(items) do d
+    domain = d["Origins"]["Items"][1]["DomainName"]
+    startswith(domain, bucket)
+  end
+  @assert !isnothing(i) "no distribution found for $bucket"
+  items[i]["Id"]
+end
 
 "Serve a directory over TCP on a localhost port"
 @cli serve(directory::String=pwd(); port::Integer=get(ENV,"PORT",0), addr::String="localhost") = begin
@@ -48,6 +60,7 @@ end
     @info "uploading" path length(data)
     write(joinpath(S3, path), data)
   end
+  run(`aws cloudfront create-invalidation --distribution-id $(distribution_id(bucket)) --paths "/*"`)
 end
 
 "Compile <file/folder> to a tarball that can be thrown up on a static web server"
