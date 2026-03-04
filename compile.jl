@@ -190,6 +190,32 @@ function todocument(file, object)
       [:title file.path.name]
       [:meta charset="UTF-8"]
       need(DOM.css[])
+      [:style raw"""
+      @media print {
+        @page {
+          size: A4;
+          margin: 1.5cm;
+        }
+        body {
+          font-size: 10pt !important;
+          margin: 0 !important;
+        }
+        body > div {
+          max-width: 30em !important;
+        }
+        .footnote-def {
+          width: 14em !important;
+        }
+        .footnote-def.left { left: -15em !important; }
+        .footnote-def.right { right: -15em !important; }
+        h1, h2, h3, h4 {
+          break-after: avoid;
+        }
+        pre, blockquote, table, img {
+          break-inside: avoid;
+        }
+      }
+      """]
       # move footnotes into correct location
       [:script raw"""
       document.addEventListener('DOMContentLoaded', () => {
