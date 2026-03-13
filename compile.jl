@@ -194,7 +194,7 @@ function todocument(file, object)
       @media print {
         @page {
           size: A4;
-          margin: 1.5cm;
+          margin: 1cm;
         }
         body {
           font-size: 10pt !important;
@@ -204,10 +204,10 @@ function todocument(file, object)
           max-width: 30em !important;
         }
         .footnote-def {
-          width: 14em !important;
+          width: 15em !important;
         }
-        .footnote-def.left { left: -15em !important; }
-        .footnote-def.right { right: -15em !important; }
+        .footnote-def.left { left: -16em !important; }
+        .footnote-def.right { right: -16em !important; }
         h1, h2, h3, h4 {
           break-after: avoid;
         }
