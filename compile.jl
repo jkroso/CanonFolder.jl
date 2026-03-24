@@ -58,17 +58,18 @@ function compile(io::IO, dir::Directory, children, deps)
       """
       html(deps[FSPath(children[i].name)].value)]
   end
+  body = @dom[:body css"margin: 1em auto; max-width: 75em"
+    [:div css"""
+      display: flex
+      flex-direction: column
+      align-items: center
+      justify-content: space-around
+      """
+      readme
+      directory(dir.path, children, io, deps)]]
   dom = @dom[:html
     [:head [:title dir.path.name] [:meta charset="UTF-8"] need(css[])]
-    [:body css"margin: 1em auto; max-width: 75em"
-      [:div css"""
-        display: flex
-        flex-direction: column
-        align-items: center
-        justify-content: space-around
-        """
-        readme
-        directory(dir.path, children, io, deps)]]]
+    body]
   dom = compile_dependencies(subctx(io, dir), dom, deps)
   insert_tracker!(dom, io)
   writefile(io, dir, MIME("text/html"), dom)
