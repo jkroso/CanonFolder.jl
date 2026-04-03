@@ -263,6 +263,14 @@ parsemd(str) = begin
   MarkdownDocument(CommonMark.frontmatter(md), doc)
 end
 
+"Parse a string as inline markdown, unwrapping single paragraphs"
+inline_md(str::AbstractString) = begin
+  isempty(str) && return ""
+  doc = ast_to_dom(md_parser(str))
+  length(doc.children) == 1 && doc.children[1] isa DOM.Container{:p} && return @dom[:span doc.children[1].children...]
+  doc
+end
+
 Base.show(io::IO, M::MIME"text/html", md::MarkdownDocument) = show(io, M, md.content)
 
 readin((;path)::File{:md}) = parsemd(read(path, String))

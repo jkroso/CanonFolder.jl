@@ -3,7 +3,7 @@
 @use "github.com/jkroso/JSON.jl/read"
 @use "github.com/jkroso/Units.jl" B Magnitude abbr Byte
 @use "github.com/jkroso/DOM.jl" => DOM css @dom @css_str ["html"]
-@use "./load" Compilable MarkdownDocument BookReview
+@use "./load" Compilable MarkdownDocument BookReview inline_md
 @use "./Tar" TarBuffer writefile
 @use Dates: unix2datetime, format, @dateformat_str, Date
 @use MIMEs: mime_from_extension, extension_from_mime
@@ -141,8 +141,8 @@ describe(c::Compilable) = @dom[:div class="summary" describe(c.source, c.value, 
 describe(value) = ""
 describe(source, value) = describe(value)
 describe(source, value, deps) = describe(source, value)
-describe(::File{:md}, md::MarkdownDocument) = get(md.meta, "description", "")
-describe(::File{:review}, br::BookReview) = br.description
+describe(::File{:md}, md::MarkdownDocument) = inline_md(get(md.meta, "description", ""))
+describe(::File{:review}, br::BookReview) = inline_md(br.description)
 describe(d::Directory, value, deps) = haskey(deps, fs"Readme.md") ? describe(deps[fs"Readme.md"]) : ""
 
 iscomplete(c::Compilable) = iscomplete(c.source, c.value)
@@ -460,7 +460,7 @@ function html(review::BookReview)
     [:div
       [:a href=string(review.link) review.link.host]
       [:span string(fill('★', review.rating)...)]
-      [:span review.description]
+      [:span inline_md(review.description)]
       [:div format(review.pubDate, dateformat"yyyy")]]
     review.content]
 end
