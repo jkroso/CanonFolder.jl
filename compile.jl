@@ -17,6 +17,224 @@ const folder_icon = parse(MIME("text/html"), read(icon_folder * theme["directory
 const book_review_icon = parse(MIME("text/html"), read(joinpath(@dirname, "book-review.svg")))
 const draft = parse(MIME("text/html"), read(joinpath(@dirname, "draft.svg")))
 
+# Every page is set in Literata, a book face drawn for reading on screens, on cream paper with warm ink. Links are
+# the one colour: a rubric red.
+const fonts_url = "https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400..700;1,7..72,400..700&display=swap"
+const page_head = [@dom[:meta charset="UTF-8"],
+                   @dom[:meta name="viewport" content="width=device-width, initial-scale=1"],
+                   @dom[:meta name="color-scheme" content="light"],
+                   @dom[:link rel="preconnect" href="https://fonts.googleapis.com"],
+                   @dom[:link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous"],
+                   @dom[:link rel="stylesheet" href=fonts_url]]
+
+const paper_css = raw"""
+:root {
+  --paper: #f5efe1;
+  --paper-raised: #faf6ec;
+  --paper-sunk: #ece3cf;
+  --ink: #2b2620;
+  --ink-2: #574e41;
+  --ink-3: #6e6352;
+  --rule: #ddd1b8;
+  --rule-strong: #c4b391;
+  --accent: #963820;
+  --accent-soft: rgba(150, 56, 32, 0.34);
+  --select: #ecd3be;
+  --serif: "Literata", "Iowan Old Style", Charter, Georgia, serif;
+  --mono: ui-monospace, "SF Mono", "Source Code Pro", Menlo, Consolas, monospace;
+  --measure: 33.5em;
+  color-scheme: light;
+}
+html { background: var(--paper); -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body {
+  margin: 0;
+  padding: 0 1.25rem;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: clamp(1.0625rem, 0.95rem + 0.4vw, 1.1875rem);
+  line-height: 1.62;
+  font-optical-sizing: auto;
+  font-kerning: normal;
+  font-variant-ligatures: common-ligatures;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  hanging-punctuation: first;
+}
+::selection { background: var(--select); color: var(--ink); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 2px; }
+a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-color: var(--accent-soft);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+  transition: text-decoration-color 0.15s ease-out, color 0.15s ease-out;
+}
+a:hover { text-decoration-color: currentColor; }
+
+/* the reading column */
+.essay, .review { max-width: var(--measure); margin: 0 auto; padding: clamp(2.5rem, 7vw, 4.5rem) 0 5rem; }
+.md { position: relative; }
+h1, h2, h3, h4 { color: var(--ink); line-height: 1.15; text-wrap: balance; font-variant-numeric: lining-nums; }
+h1 { font-size: 2.3em; font-weight: 640; letter-spacing: -0.02em; line-height: 1.08; text-align: center; margin: 0 0 1.1em; }
+h2 { font-size: 1.4em; font-weight: 620; letter-spacing: -0.01em; margin: 2.1em 0 0.55em; }
+h3 { font-size: 1.12em; font-weight: 620; margin: 1.8em 0 0.45em; }
+h4 { font-size: 1em; font-weight: 560; font-style: italic; margin: 1.6em 0 0.4em; }
+h1 + h2, h2 + h3 { margin-top: 0.6em; }
+p { margin: 0 0 1.05em; }
+p, li { text-wrap: pretty; hyphens: auto; -webkit-hyphens: auto; }
+ul, ol { margin: 0 0 1.05em; padding-left: 1.4em; }
+li { margin: 0.3em 0; }
+li > * { margin-top: 0; margin-bottom: 0; }
+li::marker { color: var(--ink-3); }
+strong, b { font-weight: 640; }
+em, i { font-style: italic; }
+hr { border: 0; width: 5em; height: 1px; margin: 2.6em auto; background: var(--rule-strong); }
+img, video, svg { max-width: 100%; height: auto; }
+section { display: flex; justify-content: center; }
+sup, sub { line-height: 0; }
+blockquote { position: relative; margin: 1.9em 0; padding: 0 0 0 1.6em; color: var(--ink-2); font-style: italic; }
+blockquote::before {
+  content: "\201C"; position: absolute; left: -0.06em; top: -0.18em;
+  font-size: 2.9em; line-height: 1; font-style: normal; color: var(--accent); opacity: 0.4;
+}
+blockquote p { margin: 0 0 0.7em; }
+blockquote p:last-child { margin-bottom: 0; }
+blockquote cite { display: block; margin-top: 0.7em; font-style: normal; font-size: 0.9em; color: var(--ink-3); text-align: right; }
+code { font-family: var(--mono); font-size: 0.84em; background: var(--paper-sunk); padding: 0.12em 0.32em; border-radius: 3px; }
+pre, .highlight > pre {
+  font: 0.84em/1.6 var(--mono); background: var(--paper-raised); color: var(--ink);
+  border: 1px solid var(--rule); border-radius: 4px; padding: 1em 1.2em; overflow-x: auto; margin: 1.5em 0;
+}
+pre code { background: none; padding: 0; font-size: 1em; }
+table { border-collapse: collapse; width: 100%; margin: 1.6em 0; font-size: 0.92em; font-variant-numeric: lining-nums tabular-nums; }
+th, td { text-align: left; vertical-align: top; padding: 0.45em 1em 0.45em 0; border-bottom: 1px solid var(--rule); }
+th { color: var(--ink-2); font-weight: 600; border-bottom-color: var(--rule-strong); }
+
+/* footnotes: notes in the margin beside the line that calls them, or gathered at the end when there's no margin */
+.footnote-ref {
+  position: absolute; width: 0.42em; height: 0.42em; margin: 0.36em 0 0 0.1em;
+  border-radius: 50%; background: var(--accent); color: transparent; text-decoration: none;
+}
+.footnote-def {
+  position: absolute; width: 13.5rem; box-sizing: border-box;
+  font-size: 0.8em; line-height: 1.45; color: var(--ink-2);
+  padding: 0.1em 0 0.1em 0.9em; border-left: 1px solid var(--rule-strong);
+}
+.footnote-def.right { right: -16.5rem; }
+.footnote-def.left { left: -16.5rem; }
+.footnote-def p { margin: 0 0 0.5em; hyphens: manual; }
+.footnote-def p:last-child { margin: 0; }
+@media (max-width: 77rem) {
+  .footnote-ref {
+    position: static; width: auto; height: auto; margin: 0 0 0 0.05em;
+    background: none !important; color: var(--fn, var(--accent)); font-size: 0.85em; font-variant-numeric: lining-nums;
+  }
+  .footnote-def {
+    position: static; width: auto; font-size: 0.86em; margin: 0; padding: 0.7em 0 0.7em 1.8em;
+    border-left: 0; border-top: 1px solid var(--rule); position: relative;
+  }
+  .footnote-def.left, .footnote-def.right { left: auto; right: auto; }
+  .footnote-def::before { content: attr(data-n); position: absolute; left: 0; color: var(--fn, var(--accent)); font-variant-numeric: lining-nums; }
+}
+
+/* book reviews */
+.review .meta {
+  display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: 0.3em 1.1em;
+  margin: -0.4em 0 1.3em; font-size: 0.9em; color: var(--ink-3); font-variant-numeric: lining-nums;
+}
+.review .stars { color: #8f6516; letter-spacing: 0.12em; }
+.review .standfirst {
+  max-width: 28em; margin: 0 auto 2.4em; text-align: center; font-style: italic;
+  font-size: 1.12em; line-height: 1.45; color: var(--ink-2); text-wrap: balance;
+}
+
+/* folders: a preface from the readme, then the listing */
+.index { max-width: 52rem; margin: 0 auto; padding: clamp(2rem, 6vw, 4rem) 0 4rem; }
+.preface { display: block; margin: 0 0 2.6rem; }
+.preface .essay { max-width: none; }
+.preface .essay { padding: 0; }
+.preface .md > :last-child { margin-bottom: 0; }
+.listing {
+  display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 4fr) auto auto auto;
+  font-size: 0.8em; line-height: 1.45; font-variant-numeric: lining-nums tabular-nums;
+}
+.listing .header {
+  padding: 0 1.1rem 0.45em 0; border-bottom: 1px solid var(--rule-strong);
+  font-size: 0.78em; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3);
+}
+.listing .cell { display: flex; align-items: center; min-width: 0; padding: 0.45em 1.1rem 0.45em 0; border-bottom: 1px solid var(--rule); }
+.listing .header:nth-child(5n), .listing .cell:nth-child(5n) { padding-right: 0; }
+.listing .cell:nth-last-child(-n+5) { border-bottom: none; }
+.listing .header:nth-child(5n+3), .listing .header:nth-child(5n+4), .listing .header:nth-child(5n),
+.listing .cell:nth-child(5n+3), .listing .cell:nth-child(5n+4), .listing .cell:nth-child(5n) { justify-content: flex-end; text-align: right; }
+.listing .cell:nth-child(5n+3), .listing .cell:nth-child(5n+4), .listing .cell:nth-child(5n) { color: var(--ink-3); font-size: 0.9em; white-space: nowrap; }
+.listing a { display: inline-flex; align-items: center; color: var(--ink); font-weight: 560; text-decoration: none; }
+.listing a:hover { color: var(--accent); }
+.listing a:hover > span:last-child, .listing a:hover { text-decoration: underline; text-decoration-color: var(--accent-soft); text-underline-offset: 0.2em; }
+.listing a svg { flex: none; width: 1.3em; height: auto; margin-right: 0.6em; }
+.listing .summary { color: var(--ink-2); font-style: italic; }
+@media (max-width: 44rem) {
+  .listing { grid-template-columns: minmax(0, 1fr); }
+  .listing .header, .listing .cell:nth-child(5n+3), .listing .cell:nth-child(5n+4), .listing .cell:nth-child(5n) { display: none; }
+  .listing .cell:nth-child(5n+1) { border-bottom: none; padding-bottom: 0.1em; }
+  .listing .cell:nth-child(5n+2) { padding: 0 0 0.55em 1.9em; font-size: 0.95em; }
+  .listing .cell:nth-child(5n+2):empty { padding-bottom: 0.6em; }
+}
+
+@media print {
+  @page { size: A4; margin: 1.6cm; }
+  html, body { background: #fff; }
+  body { font-size: 10.5pt; padding: 0; }
+  .essay, .review { max-width: 32em; padding: 0; }
+  .footnote-def { width: 12em; font-size: 0.78em; }
+  .footnote-def.left { left: -13em; }
+  .footnote-def.right { right: -13em; }
+  h1, h2, h3, h4 { break-after: avoid; }
+  pre, blockquote, table, img { break-inside: avoid; }
+}
+"""
+
+# Places each footnote in the margin beside the line that calls it, alternating sides, keeping notes on the same side
+# from overlapping. Where there's no margin the CSS gathers them at the end, numbered.
+const sidenotes_js = raw"""
+document.addEventListener('DOMContentLoaded', () => {
+  const colors = ['#a84a2b', '#386e68', '#8a6214', '#685892', '#4a6e37', '#a14760', '#3b6795', '#86663b', '#2e685a', '#973b2a', '#605c87', '#55712d']
+  const notes = []
+  document.querySelectorAll('.footnote-def').forEach((def, i) => {
+    const ref = document.querySelector(`.footnote-ref[href="#${def.id}"]`)
+    if (!ref) return
+    const color = colors[i % colors.length]
+    def.style.borderColor = color
+    def.style.setProperty('--fn', color)
+    ref.style.backgroundColor = color
+    ref.style.setProperty('--fn', color)
+    def.dataset.n = ref.textContent.trim()
+    def.classList.add(i % 2 ? 'left' : 'right')
+    notes.push({ def, ref })
+  })
+  const wide = matchMedia('(min-width: 77.0625rem)')
+  const place = () => {
+    const end = { left: -Infinity, right: -Infinity }
+    const byPosition = notes.slice().sort((a, b) => a.ref.getBoundingClientRect().top - b.ref.getBoundingClientRect().top)
+    for (const { def, ref } of byPosition) {
+      if (!wide.matches) { def.style.top = ''; continue }
+      const host = def.offsetParent || def.parentElement
+      const side = def.classList.contains('left') ? 'left' : 'right'
+      let top = ref.getBoundingClientRect().top - host.getBoundingClientRect().top - 3
+      top = Math.max(top, end[side] + 14)
+      def.style.top = top + 'px'
+      end[side] = top + def.offsetHeight
+    }
+  }
+  place()
+  if (document.fonts) document.fonts.ready.then(place)
+  wide.addEventListener('change', place)
+  addEventListener('resize', place)
+})
+"""
+
 fileicon(::Directory) = folder_icon
 fileicon(::File{:review}) = book_review_icon
 fileicon((;path)::File) = begin
@@ -42,33 +260,11 @@ compile(io::IO, c::Compilable) = compile(io, c.source, c.value, c.dependencies)
 function compile(io::IO, dir::Directory, children, deps)
   i = findfirst(x->occursin(r"readme\..+"i, x), map(field"name", children))
   readme = if !isnothing(i)
-    @dom[:div css"""
-      width: 100%
-      background: white
-      border: 1px solid #A4A4A4
-      border-radius: 12px
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1)
-      margin: 1em 0
-      padding: 1em
-      box-sizing: border-box
-      line-height: 1.5em
-      font-size: 14pt
-      font-family: sans-serif
-      font-weight: 100
-      """
-      html(deps[FSPath(children[i].name)].value)]
+    @dom[:section class="preface" html(deps[FSPath(children[i].name)].value)]
   end
-  body = @dom[:body css"margin: 1em auto; max-width: 75em"
-    [:div css"""
-      display: flex
-      flex-direction: column
-      align-items: center
-      justify-content: space-around
-      """
-      readme
-      directory(dir.path, children, io, deps)]]
+  body = @dom[:body [:div class="index" readme directory(dir.path, children, io, deps)]]
   dom = @dom[:html
-    [:head [:title dir.path.name] [:meta charset="UTF-8"] need(css[])]
+    [:head [:title dir.path.name] page_head... invokelatest(need, css[]) [:style paper_css]]
     body]
   dom = compile_dependencies(subctx(io, dir), dom, deps)
   insert_tracker!(dom, io)
@@ -94,38 +290,7 @@ function directory(dir::FSPath, children, io, deps)
        @dom[:div class="cell" showdate(entry.mtime)],]
      end)
    for (path,entry) in deps if !shouldignore(path, ignores)])
-  @dom[:div css"""
-    width: 100%
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif
-    border: 1px solid #A4A4A4
-    border-radius: 12px
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1)
-    display: grid
-    grid-template-columns: 2fr 4fr 1fr 1fr 1fr
-    overflow: hidden
-    .header
-      background: #f8f9fa
-      padding: 16px 20px
-      font-weight: 600
-      color: #374151
-      border-bottom: 1px solid #A4A4A4
-    .cell
-      padding: 12px 20px
-      border-bottom: 1px solid rgb(225,225,225)
-      display: flex
-      align-items: center
-    .cell:nth-last-child(-n+5)
-      border-bottom: none
-    a
-      display: inline-flex
-      align-items: center
-      color: #2563eb
-      text-decoration: none
-      font-weight: 500
-      svg {width: 2em; margin-right: 1em; flex: none}
-    a:hover
-      text-decoration: underline
-    """
+  @dom[:div class="listing"
     [:div class="header" "Name"]
     [:div class="header" "Description"]
     [:div class="header" "Size"]
@@ -170,7 +335,7 @@ mime_type(c::Compilable) = mime_type(c.source)
 
 html(x::DOM.Node) = x
 html(x) = convert(DOM.Node, x)
-html(md::MarkdownDocument) = @dom[:div css"max-width: 39em; margin: auto" md.content]
+html(md::MarkdownDocument) = @dom[:article class="essay" md.content]
 
 function compile(io::IO, file::Union{File{:jl},File{:md},File{:review}}, obj, deps)
   mime = invokelatest(compiled_type, file, obj)
@@ -188,141 +353,12 @@ function todocument(file, object)
   object isa DOM.Container{:html} && return object
   @dom[:html
     [:head
-      [:title file.path.name]
-      [:meta charset="UTF-8"]
+      [:title splitext(file.path.name)[1]]
+      page_head...
       need(DOM.css[])
-      [:style raw"""
-      @media print {
-        @page {
-          size: A4;
-          margin: 1cm;
-        }
-        body {
-          font-size: 10pt !important;
-          margin: 0 !important;
-        }
-        body > div {
-          max-width: 30em !important;
-        }
-        .footnote-def {
-          width: 15em !important;
-        }
-        .footnote-def.left { left: -16em !important; }
-        .footnote-def.right { right: -16em !important; }
-        h1, h2, h3, h4 {
-          break-after: avoid;
-        }
-        pre, blockquote, table, img {
-          break-inside: avoid;
-        }
-      }
-      """]
-      # move footnotes into correct location
-      [:script raw"""
-      document.addEventListener('DOMContentLoaded', () => {
-        colors = [
-          "#FF6B6B", /* Coral Red */
-          "#4ECDC4", /* Turquoise */
-          "#FFD166", /* Golden Yellow */
-          "#FF8C00", /* Dark Orange */
-          "#8338EC", /* Vibrant Purple */
-          "#EF476F", /* Bright Pink */
-          "#118AB2", /* Deep Blue */
-          "#F4A261", /* Peach */
-          "#073B4C", /* Dark Teal */
-          "#D00000", /* Crimson */
-          "#C9ADA7", /* Soft Mauve */
-          "#06D6A0", /* Mint Green */
-        ]
-        var i = 0
-        document.querySelectorAll('.footnote-def').forEach((def)=>{
-          color = colors[i++ % 12]
-          ref = document.querySelector(`.footnote-ref[href="#${def.id}"]`)
-          def.style.top = ref.getBoundingClientRect().top
-          def.style.borderColor = color
-          ref.style.backgroundColor = color
-          def.classList.add(i%2 ? "right" : "left")
-        })
-      })
-      """]]
-    [:body css"""
-      margin: 0 auto
-      font: lighter 1.2em/1.5em sans-serif;
-      div.md { position: relative; margin: 1em 0 }
-      .highlight > pre
-        font: 1em SourceCodePro-light
-        padding: 1em
-      li > *
-        margin-top: 0
-        margin-bottom: 0
-      li
-        margin: 0.2em 0
-      section
-        display: flex
-        justify-content: center
-      h1
-        text-align: center
-        margin-bottom: 1em
-        line-height: 1.2em
-      blockquote
-        margin: 2rem 0
-        padding: 1.5rem 2rem
-        background-color: #f8f9fa
-        border-left: 6px solid #007bff
-        border-radius: 8px
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1)
-        font-family: 'Georgia', serif
-        font-style: italic
-        color: #333
-        position: relative
-        overflow: hidden
-      blockquote::before
-        content: '“'
-        position: absolute
-        top: -0.5rem
-        left: 0.5rem
-        font-size: 6rem
-        color: rgba(0, 123, 255, 0.2);
-        line-height: 1
-      blockquote::after
-        content: '”'
-        position: absolute
-        bottom: -1.5rem
-        right: 0.5rem
-        font-size: 6rem
-        color: rgba(0, 123, 255, 0.2)
-        line-height: 1
-      blockquote p
-        margin: 0
-        font-size: 1.1rem
-        line-height: 1.6
-      blockquote cite
-        display: block
-        margin-top: 1rem
-        font-style: normal
-        font-size: 0.9rem
-        color: #6c757d
-        text-align: right
-      .footnote-ref
-        color: transparent
-        position: absolute
-        border-radius: 50%
-        height: .4em
-        width: .4em
-      .footnote-def
-        position: absolute
-        width: 20em
-        padding: .1em 1em
-        font-size: 0.65em
-        line-height: 1.3em
-        border-radius: 1em
-        border-left: 1px solid
-        border-top: 1px solid
-        box-sizing: border-box
-      .footnote-def.left { left: -24em }
-      .footnote-def.right { right: -24em }
-      """
-      html(object)]]
+      [:style paper_css]
+      [:script sidenotes_js]]
+    [:body html(object)]]
 end
 
 compiled_type(_) = MIME("text/html")
@@ -333,6 +369,7 @@ compiled_type(::File{:md}, value) = compiled_type(value)
 compiled_type(::File{:review}, value) = MIME("text/html")
 compiled_type(::File{:less}, value) = MIME("text/css")
 encode(mime, data) = convert(Vector{UInt8}, codeunits(sprint(show, mime, data)))
+encode(mime::MIME"text/html", data::DOM.Container{:html}) = convert(Vector{UInt8}, codeunits("<!DOCTYPE html>" * sprint(show, mime, data)))
 encode(mime, data::Vector{UInt8}) = data
 
 function compile(io::IOContext, file::File{:less}, data, deps)
@@ -404,64 +441,13 @@ shouldignore(path::FSPath, ignores) = begin
 end
 
 function html(review::BookReview)
-  @dom[:article css"""
-    max-width: 800px
-    margin: 2rem auto
-    padding: 2rem
-    background-color: #ffffff
-    border-radius: 12px
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1)
-    font-family: sans-serif
-    line-height: 1.6
-    color: #333
-    h1
-      font-size: 2.5rem
-      margin-bottom: 1rem
-      color: #1a1a1a
-      border-bottom: 2px solid #eee
-      padding-bottom: 0.5rem
-    > div
-      display: flex
-      align-items: center
-      gap: 1rem
-      margin-bottom: 1.5rem
-      font-size: 0.9rem
-      color: #666
-    > div a
-      text-decoration: none
-      color: #007bff
-      font-weight: bold
-      transition: color 0.3s ease
-    > div a:hover
-      color: #0056b3
-    > div span:first-of-type
-      color: #ffd700
-      font-size: 1.2rem
-    > div span:nth-of-type(2) { flex-grow: 1 }
-    > div > div
-      background-color: #f0f0f0
-      padding: 0.3rem 0.8rem
-      border-radius: 20px
-      font-weight: bold
-      color: #444
-    > div.md { flex-wrap: wrap }
-    > div.md > p
-      align-self: self-start
-      width: calc(33.3% - 0.8rem)
-    div.md:has(> :nth-child(2)):not(:has(> :nth-child(3))) > p { width: calc(50% - 0.5rem)}
-    div.md:not(:has(> :nth-child(2))) > p { width: 100% }
-    p { margin-bottom: 1rem }
-    a
-      color: #007bff;
-      text-decoration: underline
-    a:hover { text-decoration: none }
-    """
+  @dom[:article class="review"
     [:h1 review.title]
-    [:div
+    [:div class="meta"
       [:a href=string(review.link) review.link.host]
-      [:span string(fill('★', review.rating)...)]
-      [:span inline_md(review.description)]
-      [:div format(review.pubDate, dateformat"yyyy")]]
+      [:span class="stars" title="$(review.rating) stars" string(fill('★', review.rating)...)]
+      [:span class="year" format(review.pubDate, dateformat"yyyy")]]
+    [:div class="standfirst" inline_md(review.description)]
     review.content]
 end
 

@@ -3,7 +3,7 @@
 @use Test...
 @use Tar
 
-@test startswith(String(untar(compile(icon_folder, followlinks=false))["index.html"]), "<html>")
+@test startswith(String(untar(compile(icon_folder, followlinks=false))["index.html"]), "<!DOCTYPE html><html>")
 @test any(h->h.path == "index.html", Tar.list(IOBuffer(take!(compile(icon_folder).io.io))))
 
 let html = String(untar(compile(icon_folder, followlinks=false))["index.html"])
