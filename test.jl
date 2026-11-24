@@ -37,6 +37,21 @@ mktempdir() do dir
   @test !any(endswith(".md"), keys(untar(compile(FSPath(dir)))))
 end
 
+# With markdown, a folder's .ladder file goes in beside its page, for Ladder to ask for
+mktempdir() do dir
+  write(joinpath(dir, ".ladder"), "```julia\nLadder.BlogDirectory\n```\n")
+  mkdir(joinpath(dir, "essay"))
+  write(joinpath(dir, "essay", ".ladder"), "Its own.\n")
+  write(joinpath(dir, "essay", "index.md"), "# An essay\n")
+  mkdir(joinpath(dir, "plain"))
+  write(joinpath(dir, "plain", "a.md"), "A\n")
+  files = untar(compile(FSPath(dir), markdown=true))
+  @test String(files[".ladder"]) == "```julia\nLadder.BlogDirectory\n```\n"
+  @test String(files["essay/.ladder"]) == "Its own.\n"
+  @test !haskey(files, "plain/.ladder")
+  @test !haskey(untar(compile(FSPath(dir))), ".ladder")
+end
+
 # A folder with its own index.md is that page, with no list to replace it
 mktempdir() do dir
   mkdir(joinpath(dir, "essay"))

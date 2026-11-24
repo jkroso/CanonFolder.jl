@@ -261,6 +261,7 @@ compile(path::FSPath; kwargs...) = invokelatest(compile, Compilable(path); kwarg
 compile(io::IO, c::Compilable) = compile(io, c.source, c.value, c.dependencies)
 
 function compile(io::IO, dir::Directory, children, deps)
+  get(io, :markdown, false) && writeladder(io, dir)
   page = ownpage(deps)
   isnothing(page) || return compile(subctx(io, page.source), page)
   i = findfirst(x->occursin(r"readme\..+"i, x), map(field"name", children))
@@ -275,6 +276,15 @@ function compile(io::IO, dir::Directory, children, deps)
   insert_tracker!(dom, io)
   writefile(io, dir, MIME("text/html"), dom)
   get(io, :markdown, false) && writefile(io.io, relpath(io[:basedir], dir.path) * "index.md", markdown_page(dir, children, deps))
+end
+
+"""
+With `markdown`, a folder's `.ladder` file goes out as it is, beside the folder's page. Ladder asks a site for it, and
+gives the folder on the site the kind that the file gives the folder on the Mac
+"""
+writeladder(io, dir::Directory) = begin
+  file = string(dir.path * ".ladder")
+  isfile(file) && writefile(io.io, relpath(io[:basedir], dir.path) * ".ladder", read(file))
 end
 
 """
