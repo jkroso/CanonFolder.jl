@@ -102,3 +102,73 @@ mktempdir() do dir
   @test occursin("| [Red Plenty.md](Red%20Plenty.md) | Plans |", String(files["Book Reviews/index.md"]))
   @test String(files["Book Reviews/.ladder"]) == "Reviews.\n\n```julia\nLadder.BookReviewDirectory\n```\n"
 end
+
+# A page of Ladder's (a Markdown page with sums, sheets, charts or views) is made with Ladder's own code: each sum shows
+# what it came to, a sheet is a table, a chart is a picture, and a view of a Julia file shows what its `view` makes.
+# The page is a link to a page in another folder, and its view finds the Julia file beside the page itself.
+mktempdir() do top
+  pages, dir = mkpath(joinpath(top, "pages")), mkpath(joinpath(top, "site"))
+  write(joinpath(pages, "model.jl"), """
+    # The bytes of a .glb file, with what the page gives it after them
+    view(sums) = vcat(Vector{UInt8}("glTF"), zeros(UInt8, 16), Vector{UInt8}(string(sums["watts"])))
+    """)
+  write(joinpath(pages, "sums.md"), """
+    ---
+    title: Sums on a page
+    about: Prices and *watts*
+    ---
+
+    # Sums
+
+    Each watt is !`price = 25USD/W`, and there are !`watts = 2kW`. That's !`price * watts`.[^a] This one fails: !`nope + 1`.
+
+    ```sheet
+    Triple = watts * 3
+    ```
+
+    ## Parts
+
+    | Part | Cost |
+    |---|---|
+    | Cells | !`cells = 30USD` |
+    | Frame | !`frame = 10USD` |
+
+    ```chart
+    kind: bars
+    title: What the parts cost
+    ```
+
+    ```columns
+    2
+    ```
+
+    ```view
+    design.sc
+    ```
+
+    ```view
+    model.jl
+    ```
+
+    [^a]: A note.
+    """)
+  symlink(joinpath(pages, "sums.md"), joinpath(dir, "sums.md"))
+  write(joinpath(dir, "plain.md"), "Some `code`!\n")
+  files = untar(compile(FSPath(dir)))
+  page = String(files["sums.html"])
+  @test occursin("<title>Sums on a page</title>", page)
+  @test occursin("<span class=\"sum\" title=\"price = 25USD/W\">25USD/W</span>", page)
+  @test occursin("<span class=\"sum\" title=\"price * watts\">50,000 USD</span>", page)
+  @test occursin(r"<span class=\"sum failed\" title=\"nope \+ 1\">[^<]*nope", page)
+  @test occursin(r"<th>Triple</th><td><code>watts \* 3</code></td><td class=\"result\">6,?000W|6kW", page)
+  @test occursin("<figcaption>What the parts cost</figcaption>", page)
+  @test occursin("<svg class=\"wide\"", page) && occursin("<svg class=\"narrow\"", page) && occursin("30 USD", page)
+  @test occursin("class=\"footnote-ref\"", page) && occursin("<div class=\"footnote-def\" id=\"fn-a\"><p>A note.</p></div>", page)
+  # The view of the design can't go on the site, so the columns have one column left, and are no columns
+  @test !occursin("class=\"columns\"", page) && occursin("<model-viewer class=\"view\" src=\"model.glb\"", page)
+  @test String(files["model.glb"][21:end]) == "2000.0"   # 2kW, in SI units
+  @test occursin("model-viewer.min.js", page) && !occursin("mermaid.esm", page)
+  @test occursin("Prices and <em>watts</em>", String(files["index.html"]))
+  # Any other page is CommonMark's, as before
+  @test !occursin("class=\"sum", String(files["plain.html"]))
+end

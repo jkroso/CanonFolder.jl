@@ -122,7 +122,10 @@ end
 struct MarkdownDocument
   meta::Dict
   content::DOM.Node
+  files::Dict{String,Vector{UInt8}}   # files that go beside its page, by name, like a model that a page of Ladder's shows
 end
+
+MarkdownDocument(meta, content) = MarkdownDocument(meta, content, Dict{String,Vector{UInt8}}())
 
 dependencies(md::MarkdownDocument) = dependencies(md.content)
 
@@ -293,7 +296,26 @@ end
 
 Base.show(io::IO, M::MIME"text/html", md::MarkdownDocument) = show(io, M, md.content)
 
-readin((;path)::File{:md}) = parsemd(read(path, String))
+readin((;path)::File{:md}) = begin
+  text = read(path, String)
+  isladder(text) ? ladderpage(string(path), text) : parsemd(text)
+end
+
+"""
+True when the Markdown `text` is a page of Ladder's (github.com/jkroso/Ladder): it has a sum, like !`2 + 2`, or a block
+that Ladder works out or draws, like a sheet, a chart, a view or columns. ladder.jl makes it into HTML.
+"""
+isladder(text::AbstractString) = occursin(r"!`[^`\n]+`", text) || occursin(r"^```(?:sheet|chart|view|columns?)\s*$"m, text)
+
+const ladder = Ref{Module}()
+
+"The page of Ladder's whose Markdown is `text`, from the file at `path`. canon loads Ladder's code the first time it needs it."
+ladderpage(path::AbstractString, text::AbstractString) = begin
+  isassigned(ladder) || (ladder[] = Kip.require(joinpath(@dirname, "ladder.jl")))
+  meta, body, files = Base.invokelatest(ladder[].page, path, text)
+  MarkdownDocument(meta, @dom[:div class="md" DOM.Literal(body)], files)
+end
+
 readin((;path)::File{:jl}) = cd(()->Kip.eval_module(string(path)), path.parent)
 readin((;path)::File) = read(path)
 readin((;path)::AbstractDirectory) = readdir(path)

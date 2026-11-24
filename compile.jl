@@ -112,6 +112,48 @@ table { border-collapse: collapse; width: 100%; margin: 1.6em 0; font-size: 0.92
 th, td { text-align: left; vertical-align: top; padding: 0.45em 1em 0.45em 0; border-bottom: 1px solid var(--rule); }
 th { color: var(--ink-2); font-weight: 600; border-bottom-color: var(--rule-strong); }
 
+/* pages made in Ladder: the numbers that its sums work out, sheets, charts, diagrams, models, columns and callouts */
+.sum {
+  text-decoration: underline dotted var(--rule-strong); text-decoration-thickness: 1px; text-underline-offset: 0.24em;
+  font-variant-numeric: lining-nums; cursor: help;
+}
+td .sum, th .sum { text-decoration: none; }
+.sum.failed { color: var(--accent); }
+mark { background: #efd9a2; color: inherit; padding: 0 0.1em; border-radius: 2px; }
+math[display="block"] { margin: 1.1em 0; font-size: 1.08em; max-width: 100%; overflow-x: auto; overflow-y: hidden; }
+.sheet table { margin: 1.5em 0; font-size: 0.86em; }
+.sheet th { width: 1%; padding-right: 1.4em; white-space: nowrap; color: var(--ink); font-weight: 560; border-bottom-color: var(--rule); }
+.sheet code { background: none; padding: 0; color: var(--ink-2); font-size: 0.92em; }
+.sheet td.result { padding-right: 0; text-align: right; white-space: nowrap; }
+.sheet td.failed { color: var(--accent); }
+figure { margin: 1.9em 0; }
+figure.chart figcaption { margin: 0 0 0.5em; font-size: 0.86em; font-weight: 600; line-height: 1.35; color: var(--ink-2); }
+figure.chart svg { display: block; width: 100%; height: auto; font-variant-numeric: lining-nums tabular-nums; }
+figure.chart svg.narrow { display: none; }
+@media (max-width: 44rem) {
+  figure.chart svg.wide { display: none; }
+  figure.chart svg.narrow { display: block; }
+}
+.diagram { margin: 1.9em 0; overflow-x: auto; }
+pre.mermaid { margin: 0; padding: 0; background: none; border: 0; overflow: visible; text-align: center; font-family: var(--serif); }
+pre.mermaid:not(.drawn) { visibility: hidden; }
+.view { display: block; width: 100%; height: auto; margin: 1.9em 0; border: 0; border-radius: 6px; background: #05070b; }
+iframe.view { background: var(--paper-raised); border: 1px solid var(--rule); }
+.columns { display: flex; gap: 2em; align-items: flex-start; margin: 1.9em 0; }
+.columns > div { min-width: 0; }
+.columns > div > :first-child { margin-top: 0; }
+.columns > div > :last-child { margin-bottom: 0; }
+@media (max-width: 44rem) {
+  .columns { display: block; }
+  .columns > div + div { margin-top: 1.9em; }
+}
+blockquote.callout {
+  margin: 1.9em 0; padding: 0.9em 1.2em; border: 1px solid var(--rule); border-left: 3px solid var(--accent); border-radius: 4px;
+  background: var(--paper-raised); color: var(--ink); font-style: normal;
+}
+blockquote.callout::before { content: none; }
+blockquote.callout .callout-title { margin-bottom: 0.35em; color: var(--accent); font-weight: 620; }
+
 /* footnotes: notes in the margin beside the line that calls them, or gathered at the end when there's no margin */
 .footnote-ref {
   position: absolute; width: 0.42em; height: 0.42em; margin: 0.36em 0 0 0.1em;
@@ -411,6 +453,13 @@ function compile(io::IO, file::Union{File{:jl},File{:md},File{:review}}, obj, de
   insert_tracker!(doc, io)
   writefile(io, file, mime, doc)
   writesource(io, file)
+  writefiles(io, file, obj)
+end
+
+"The files that go beside a page, like the model that a view of a page of Ladder's shows"
+writefiles(io, file, obj) = nothing
+writefiles(io::IOContext{TarBuffer}, file, md::MarkdownDocument) = for (name, bytes) in md.files
+  writefile(io.io, relpath(io[:basedir], dirname(file)) * name, bytes)
 end
 
 "With `markdown`, a page made from a Markdown file goes out with that file, beside it"
@@ -426,7 +475,7 @@ function todocument(file, object)
   object isa DOM.Container{:html} && return object
   @dom[:html
     [:head
-      [:title pagetitle(file)]
+      [:title pagetitle(file, object)]
       page_head...
       need(DOM.css[])
       [:style paper_css]
@@ -438,6 +487,10 @@ end
 pagetitle(file) = let name = splitext(file.path.name)[1]
   lowercase(name) == "index" ? file.path.parent.name : name
 end
+
+"A page's title: the title that its front matter gives, or else `pagetitle(file)`"
+pagetitle(file, object) = pagetitle(file)
+pagetitle(file, md::MarkdownDocument) = string(get(md.meta, "title", pagetitle(file)))
 
 compiled_type(_) = MIME("text/html")
 compiled_type(::AbstractDirectory, _) = MIME("text/html")
