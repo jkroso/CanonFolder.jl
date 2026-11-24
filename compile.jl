@@ -487,7 +487,7 @@ compilelink(path::FSPath, io::IOContext, deps) = begin
     compile(subctx(io, dep.source), dep)
   end
   mime = invokelatest(compiled_type, dep.source, dep.value)
-  string(isdir(dep.source) ? path * "index.html" : setext(path, extension(mime)))
+  urlpath(string(isdir(dep.source) ? path * "index.html" : setext(path, extension(mime))))
 end
 
 getignores(dir::FSPath) = ispath(dir * ".canonignore") ? map(FilenameMatch, readlines(dir * ".canonignore")) : Any[]

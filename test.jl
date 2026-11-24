@@ -52,3 +52,11 @@ mktempdir() do dir
   @test String(files["essay/index.md"]) == "# A folder's own page\n\n![](./picture.png)\n"
   @test occursin("href=\"essay/index.html\"", String(files["index.html"]))
 end
+
+# A link to a page whose name has a character that a URL can't hold, such as a ?, has that character %-coded
+mktempdir() do dir
+  write(joinpath(dir, "Why not?.md"), "Because.\n")
+  files = untar(compile(FSPath(dir)))
+  @test occursin("href=\"Why%20not%3F.html\"", String(files["index.html"]))
+  @test haskey(files, "Why not?.html")
+end
