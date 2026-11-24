@@ -289,13 +289,13 @@ end
 
 """
 A folder's page as Markdown: its readme as written, then a table of the same rows as the page's list, each linking to
-the page that canon makes of it
+the Markdown of a page written in Markdown, or else to the page that canon makes of it
 """
 function markdown_page(dir::AbstractDirectory, children, deps)
   i = findfirst(x->occursin(r"^readme\.md$"i, x), map(field"name", children))
   readme = isnothing(i) ? "" : rstrip(read(dir.path * children[i].name, String))
   ignores = getignores(dir.path)
-  rows = ["| [$(mdcell(path.name))]($(urlpath(pagelink(path, entry))))$(iscomplete(entry) ? "" : " (draft)") | " *
+  rows = ["| [$(mdcell(path.name))]($(urlpath(mdlink(path, entry))))$(iscomplete(entry) ? "" : " (draft)") | " *
           "$(mdcell(rawdescription(entry))) | $(isodate(entry.btime)) | $(isodate(entry.mtime)) |"
           for (path, entry) in deps if !shouldignore(path, ignores)]
   table = join(["| Name | Description | Created | Modified |", "|---|---|---|---|", rows...], '\n')
@@ -316,6 +316,13 @@ end
 "Where the page that canon makes of `entry` is, from its folder"
 pagelink(path::RelativePath, entry::Compilable) =
   isdir(entry.source) ? path.name * "/" : string(setext(path, extension(invokelatest(compiled_type, entry.source, entry.value))))
+
+"""
+Where the Markdown of `entry` is, from its folder: the file itself for a page written in Markdown, which goes out
+beside its page with `markdown` (see `writesource`), or else the page that canon makes of it
+"""
+mdlink(path::RelativePath, entry::Compilable) =
+  entry.source isa Union{File{:md},File{:review}} ? string(path) : pagelink(path, entry)
 
 "`path` with each character that a URL can't hold as it is, such as a space or a `?`, written as its %-code"
 urlpath(path::AbstractString) = replace(path, r"[^A-Za-z0-9\-._~/]" => c->join(string('%', uppercase(string(b, base=16, pad=2))) for b in codeunits(c)))

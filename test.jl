@@ -29,8 +29,9 @@ mktempdir() do dir
   @test !haskey(files, "Readme.md")
   index = String(files["index.md"])
   @test startswith(index, "+++\ndescription=\"A test\"\n+++\n\nHello.\n\n| Name | Description | Created | Modified |\n")
-  @test occursin(r"\n\| \[An essay\.md\]\(An%20essay\.html\) \| Either a \\\| b \| \d{4}-\d\d-\d\d \| \d{4}-\d\d-\d\d \|\n", index)
-  @test occursin("| [Why?.md](Why%3F.html) (draft) |  | ", index)
+  @test occursin(r"\n\| \[An essay\.md\]\(An%20essay\.md\) \| Either a \\\| b \| \d{4}-\d\d-\d\d \| \d{4}-\d\d-\d\d \|\n", index)
+  @test occursin("| [Why?.md](Why%3F.md) (draft) |  | ", index)
+  @test haskey(files, "Why?.md")   # each Markdown page that the table links to goes out beside its page
   @test occursin("| [Sub folder](Sub%20folder/) | Inside |", index)
   @test !occursin("Readme", index)
   @test startswith(String(files["Sub folder/index.md"]), "+++\ndescription=\"Inside\"\n+++\n\n| Name |")
@@ -98,6 +99,6 @@ mktempdir() do dir
   genes = String(files["Humans/Genes.html"])
   # A link to the page that canon makes of a file is left as it is
   @test occursin("href=\"../Book%20Reviews/Red%20Plenty.html\"", genes) && occursin("href=\"Its%20page.html\"", genes)
-  @test occursin("| [Red Plenty.md](Red%20Plenty.html) | Plans |", String(files["Book Reviews/index.md"]))
+  @test occursin("| [Red Plenty.md](Red%20Plenty.md) | Plans |", String(files["Book Reviews/index.md"]))
   @test String(files["Book Reviews/.ladder"]) == "Reviews.\n\n```julia\nLadder.BookReviewDirectory\n```\n"
 end
