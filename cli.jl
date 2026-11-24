@@ -37,5 +37,9 @@ using Kip
   handle_requests(logger(respond), server)
 end
 
-"Compile <file/folder> to a tarball that can be thrown up on a static web server"
-@cli main(path::String) = write(stdout, compile(abs(FSPath(path))))
+"""
+Compile <file/folder> to a tarball that can be thrown up on a static web server. With --markdown, each page made from
+Markdown also goes in as that Markdown, beside it, and each folder as a Markdown list (index.md), for a server that
+sends Markdown to readers that ask for it
+"""
+@cli main(path::String; markdown::Bool=false) = write(stdout, compile(abs(FSPath(path)); markdown))

@@ -243,11 +243,14 @@ fileicon((;path)::File) = begin
   parse(MIME("text/html"), read(icon_folder * rel, String))
 end
 
-function compile(c::Compilable; tracker="", followlinks=true, basedir=dirname(c.source))
+# With `markdown`, each page made from Markdown also goes out as that Markdown, and each folder as a Markdown list, so
+# a server can send them to a reader that asks for Markdown
+function compile(c::Compilable; tracker="", followlinks=true, basedir=dirname(c.source), markdown=false)
   io = IOContext(TarBuffer(), :tracker => tracker,
                               :seen => Set{RelativePath}(),
                               :followlinks => followlinks,
                               :basedir => basedir,
+                              :markdown => markdown,
                               :currentdir => relpath(basedir, c.source.path))
   compile(io, c.source, c.value, c.dependencies)
   io
@@ -269,7 +272,41 @@ function compile(io::IO, dir::Directory, children, deps)
   dom = compile_dependencies(subctx(io, dir), dom, deps)
   insert_tracker!(dom, io)
   writefile(io, dir, MIME("text/html"), dom)
+  get(io, :markdown, false) && writefile(io.io, relpath(io[:basedir], dir.path) * "index.md", markdown_page(dir, children, deps))
 end
+
+"""
+A folder's page as Markdown: its readme as written, then a table of the same rows as the page's list, each linking to
+the page that canon makes of it
+"""
+function markdown_page(dir::Directory, children, deps)
+  i = findfirst(x->occursin(r"^readme\.md$"i, x), map(field"name", children))
+  readme = isnothing(i) ? "" : rstrip(read(dir.path * children[i].name, String))
+  ignores = getignores(dir.path)
+  rows = ["| [$(mdcell(path.name))]($(urlpath(pagelink(path, entry))))$(iscomplete(entry) ? "" : " (draft)") | " *
+          "$(mdcell(rawdescription(entry))) | $(isodate(entry.btime)) | $(isodate(entry.mtime)) |"
+          for (path, entry) in deps if !shouldignore(path, ignores)]
+  table = join(["| Name | Description | Created | Modified |", "|---|---|---|---|", rows...], '\n')
+  convert(Vector{UInt8}, codeunits(isempty(readme) ? table * '\n' : string(readme, "\n\n", table, '\n')))
+end
+
+"Where the page that canon makes of `entry` is, from its folder"
+pagelink(path::RelativePath, entry::Compilable) =
+  isdir(entry.source) ? path.name * "/" : string(setext(path, extension(invokelatest(compiled_type, entry.source, entry.value))))
+
+"`path` with each character that a URL can't hold as it is, such as a space or a `?`, written as its %-code"
+urlpath(path::AbstractString) = replace(path, r"[^A-Za-z0-9\-._~/]" => c->join(string('%', uppercase(string(b, base=16, pad=2))) for b in codeunits(c)))
+
+mdcell(s::AbstractString) = replace(s, '|' => "\\|", '[' => "\\[", ']' => "\\]", r"\s*\n\s*" => ' ')
+isodate(d::Date) = string(d)
+isodate(unixtime::Real) = string(Date(unix2datetime(unixtime)))
+
+"The description that the list of a folder shows for `c`, as the Markdown it was written in"
+rawdescription(c::Compilable) = rawdescription(c.source, c)
+rawdescription(source, c) = ""
+rawdescription(::File{:md}, c) = string(get(c.value.meta, "description", ""))
+rawdescription(::File{:review}, c) = c.value.description
+rawdescription(::Directory, c) = haskey(c.dependencies, fs"Readme.md") ? rawdescription(c.dependencies[fs"Readme.md"]) : ""
 
 function directory(dir::FSPath, children, io, deps)
   firstrow = if dir.parent ⊆ io[:basedir]
@@ -343,7 +380,13 @@ function compile(io::IO, file::Union{File{:jl},File{:md},File{:review}}, obj, de
   doc = compile_dependencies(subctx(io, file), doc, deps)
   insert_tracker!(doc, io)
   writefile(io, file, mime, doc)
+  writesource(io, file)
 end
+
+"With `markdown`, a page made from a Markdown file goes out with that file, beside it"
+writesource(io, file) = nothing
+writesource(io::IOContext{TarBuffer}, file::Union{File{:md},File{:review}}) =
+  get(io, :markdown, false) && writefile(io.io, relpath(io[:basedir], file.path), read(file.path))
 
 subctx(io, fs::FSObject) = IOContext(io, :currentdir => relpath(io[:basedir], dirname(fs)))
 
