@@ -42,7 +42,7 @@ const paper_css = raw"""
   --select: #ecd3be;
   --serif: "Literata", "Iowan Old Style", Charter, Georgia, serif;
   --mono: ui-monospace, "SF Mono", "Source Code Pro", Menlo, Consolas, monospace;
-  --measure: 33.5em;
+  --measure: 52rem;
   color-scheme: light;
 }
 html { background: var(--paper); -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
@@ -168,7 +168,7 @@ blockquote.callout .callout-title { margin-bottom: 0.35em; color: var(--accent);
 .footnote-def.left { left: -16.5rem; }
 .footnote-def p { margin: 0 0 0.5em; hyphens: manual; }
 .footnote-def p:last-child { margin: 0; }
-@media (max-width: 77rem) {
+@media (max-width: 89rem) {
   .footnote-ref {
     position: static; width: auto; height: auto; margin: 0 0 0 0.05em;
     background: none !important; color: var(--fn, var(--accent)); font-size: 0.85em; font-variant-numeric: lining-nums;
@@ -256,7 +256,7 @@ document.addEventListener('DOMContentLoaded', () => {
     def.classList.add(i % 2 ? 'left' : 'right')
     notes.push({ def, ref })
   })
-  const wide = matchMedia('(min-width: 77.0625rem)')
+  const wide = matchMedia('(min-width: 89.0625rem)')
   const place = () => {
     const end = { left: -Infinity, right: -Infinity }
     const byPosition = notes.slice().sort((a, b) => a.ref.getBoundingClientRect().top - b.ref.getBoundingClientRect().top)
