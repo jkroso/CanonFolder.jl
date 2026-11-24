@@ -76,3 +76,28 @@ mktempdir() do dir
   @test occursin("href=\"Why%20not%3F.html\"", String(files["index.html"]))
   @test haskey(files, "Why not?.html")
 end
+
+# A folder whose .ladder page names Ladder's BookReviewDirectory holds book reviews: each Markdown file in it is one,
+# and a link to one, with spaces in its path, goes to its page
+mktempdir() do dir
+  reviews = joinpath(dir, "Book Reviews")
+  mkdir(reviews)
+  write(joinpath(reviews, ".ladder"), "Reviews.\n\n```julia\nLadder.BookReviewDirectory\n```\n")
+  write(joinpath(reviews, "Readme.md"), "+++\ndescription=\"Books\"\n+++\n")
+  review = "+++\ntitle = \"Red Plenty\"\nlink = \"https://en.wikipedia.org/wiki/Red_Plenty\"\nrating = 4\npubDate = 2010-01-01\ndescription = \"Plans\"\n+++\n\nWords.\n"
+  write(joinpath(reviews, "Red Plenty.md"), review)
+  mkdir(joinpath(dir, "Humans"))
+  write(joinpath(dir, "Humans", "Genes.md"), "Read [the review](<../Book Reviews/Red Plenty.md>) and [its page](<./Its page.html>).\n")
+  write(joinpath(dir, "Humans", "Its page.md"), "A page.\n")
+  write(joinpath(dir, "Plain.md"), "+++\ntitle = \"Not a review\"\n+++\n\nWords.\n")
+  files = untar(compile(FSPath(dir), markdown=true))
+  page = String(files["Book Reviews/Red Plenty.html"])
+  @test occursin("class=\"review\"", page) && occursin("4 stars", page) && occursin("en.wikipedia.org", page)
+  @test String(files["Book Reviews/Red Plenty.md"]) == review
+  @test !occursin("class=\"review\"", String(files["Plain.html"]))
+  genes = String(files["Humans/Genes.html"])
+  # A link to the page that canon makes of a file is left as it is
+  @test occursin("href=\"../Book%20Reviews/Red%20Plenty.html\"", genes) && occursin("href=\"Its%20page.html\"", genes)
+  @test occursin("| [Red Plenty.md](Red%20Plenty.html) | Plans |", String(files["Book Reviews/index.md"]))
+  @test String(files["Book Reviews/.ladder"]) == "Reviews.\n\n```julia\nLadder.BookReviewDirectory\n```\n"
+end

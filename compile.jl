@@ -1,9 +1,9 @@
-@use "github.com/jkroso/URI.jl" ["FSPath" FSPath @fs_str RelativePath] ["FS" Directory File FSObject]
+@use "github.com/jkroso/URI.jl" ["FSPath" FSPath @fs_str RelativePath] ["FS" Directory File FSObject AbstractDirectory]
 @use "github.com/jkroso/Prospects.jl" assoc need @field_str flatten
 @use "github.com/jkroso/JSON.jl/read"
 @use "github.com/jkroso/Units.jl" B Magnitude abbr Byte
 @use "github.com/jkroso/DOM.jl" => DOM css @dom @css_str ["html"]
-@use "./load" Compilable MarkdownDocument BookReview inline_md
+@use "./load" Compilable MarkdownDocument BookReview inline_md unescaped
 @use "./Tar" TarBuffer writefile
 @use Dates: unix2datetime, format, @dateformat_str, Date
 @use MIMEs: mime_from_extension, extension_from_mime
@@ -235,7 +235,7 @@ document.addEventListener('DOMContentLoaded', () => {
 })
 """
 
-fileicon(::Directory) = folder_icon
+fileicon(::AbstractDirectory) = folder_icon
 fileicon(::File{:review}) = book_review_icon
 fileicon((;path)::File) = begin
   name = get(theme["file_suffixes"], path.extension, "binary")
@@ -260,7 +260,7 @@ end
 compile(path::FSPath; kwargs...) = invokelatest(compile, Compilable(path); kwargs...)
 compile(io::IO, c::Compilable) = compile(io, c.source, c.value, c.dependencies)
 
-function compile(io::IO, dir::Directory, children, deps)
+function compile(io::IO, dir::AbstractDirectory, children, deps)
   get(io, :markdown, false) && writeladder(io, dir)
   page = ownpage(deps)
   isnothing(page) || return compile(subctx(io, page.source), page)
@@ -282,7 +282,7 @@ end
 With `markdown`, a folder's `.ladder` file goes out as it is, beside the folder's page. Ladder asks a site for it, and
 gives the folder on the site the kind that the file gives the folder on the Mac
 """
-writeladder(io, dir::Directory) = begin
+writeladder(io, dir::AbstractDirectory) = begin
   file = string(dir.path * ".ladder")
   isfile(file) && writefile(io.io, relpath(io[:basedir], dir.path) * ".ladder", read(file))
 end
@@ -291,7 +291,7 @@ end
 A folder's page as Markdown: its readme as written, then a table of the same rows as the page's list, each linking to
 the page that canon makes of it
 """
-function markdown_page(dir::Directory, children, deps)
+function markdown_page(dir::AbstractDirectory, children, deps)
   i = findfirst(x->occursin(r"^readme\.md$"i, x), map(field"name", children))
   readme = isnothing(i) ? "" : rstrip(read(dir.path * children[i].name, String))
   ignores = getignores(dir.path)
@@ -329,7 +329,7 @@ rawdescription(c::Compilable) = rawdescription(c.source, c)
 rawdescription(source, c) = ""
 rawdescription(::File{:md}, c) = string(get(c.value.meta, "description", ""))
 rawdescription(::File{:review}, c) = c.value.description
-rawdescription(::Directory, c) = haskey(c.dependencies, fs"Readme.md") ? rawdescription(c.dependencies[fs"Readme.md"]) : ""
+rawdescription(::AbstractDirectory, c) = haskey(c.dependencies, fs"Readme.md") ? rawdescription(c.dependencies[fs"Readme.md"]) : ""
 
 function directory(dir::FSPath, children, io, deps)
   firstrow = if dir.parent ⊆ io[:basedir]
@@ -368,7 +368,7 @@ describe(source, value) = describe(value)
 describe(source, value, deps) = describe(source, value)
 describe(::File{:md}, md::MarkdownDocument) = inline_md(get(md.meta, "description", ""))
 describe(::File{:review}, br::BookReview) = inline_md(br.description)
-describe(d::Directory, value, deps) = haskey(deps, fs"Readme.md") ? describe(deps[fs"Readme.md"]) : ""
+describe(d::AbstractDirectory, value, deps) = haskey(deps, fs"Readme.md") ? describe(deps[fs"Readme.md"]) : ""
 
 iscomplete(c::Compilable) = iscomplete(c.source, c.value)
 iscomplete(source, value) = true
@@ -390,7 +390,7 @@ end
 const binary_mime = MIME("application/octet-stream")
 mime_type(f::FSPath) = isdir(f) ? MIME("inode/directory") : mime_from_extension(f.extension, binary_mime)
 mime_type(f::File) = mime_from_extension(f.path.extension, binary_mime)
-mime_type(f::Directory) = MIME("inode/directory")
+mime_type(f::AbstractDirectory) = MIME("inode/directory")
 mime_type(c::Compilable) = mime_type(c.source)
 
 html(x::DOM.Node) = x
@@ -433,7 +433,7 @@ pagetitle(file) = let name = splitext(file.path.name)[1]
 end
 
 compiled_type(_) = MIME("text/html")
-compiled_type(::Directory, _) = MIME("text/html")
+compiled_type(::AbstractDirectory, _) = MIME("text/html")
 compiled_type(::File{x}, value) where x = mime_from_extension(string(x), binary_mime)
 compiled_type(::File{:jl}, value) = compiled_type(value) # julia can produce objects that compile to anything
 compiled_type(::File{:md}, value) = compiled_type(value)
@@ -459,7 +459,7 @@ writefile(io::IOContext{TarBuffer}, infile::FSObject, mime::MIME, data) = begin
   writefile(io.io, outpath(io, infile, mime), invokelatest(encode, mime, data))
 end
 
-outpath(io::IOContext, d::Directory, mime) = relpath(io[:basedir], d.path) * "index.html"
+outpath(io::IOContext, d::AbstractDirectory, mime) = relpath(io[:basedir], d.path) * "index.html"
 outpath(io::IOContext, f::File, mime) = setext(relpath(io[:basedir], f.path), extension(mime))
 outpath(io::IOContext, f::File{Symbol("")}, mime) = setext(relpath(io[:basedir], f.path), mime == binary_mime ? "" : extension(mime))
 
@@ -489,7 +489,9 @@ crawl_string(str, io, deps) = replace(str, relative_path => (m)->compilelink(m, 
 
 compilelink(src::AbstractString, io::IOContext, deps) = begin
   isempty(src) || occursin(r"^(\w+?:|#)", src) && return src # ignore remote URLs
-  compilelink(FSPath(src), io, deps)
+  # A link with a %-code, like ../Book%20Reviews/Red%20Plenty.md, names the file that has the character
+  plain = FSPath(unescaped(src))
+  compilelink(haskey(deps, plain) ? plain : FSPath(src), io, deps)
 end
 
 compilelink(path::FSPath, io::IOContext, deps) = begin

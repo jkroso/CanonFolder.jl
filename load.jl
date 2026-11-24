@@ -1,4 +1,5 @@
-@use "github.com/jkroso/URI.jl" URI ["FSPath.jl" FSPath @fs_str] ["FS.jl" File Directory FSObject]
+@use "github.com/jkroso/URI.jl" URI ["FSPath.jl" FSPath @fs_str] ["FS.jl" File Directory FSObject AbstractDirectory]
+@use "github.com/jkroso/URI.jl/FS" => FS
 @use "github.com/jkroso/Prospects.jl" @field_str @def @property @lazyprop
 @use "github.com/jkroso/Sequences.jl" Cons push ["collections/Map" Map]
 @use "github.com/jkroso/DOM.jl" => DOM @dom
@@ -58,21 +59,23 @@ end
 
 @lazyprop Compilable.dependencies = begin
   path = dirname(self.source)
-  deps = dependencies(self.source, self.value)
+  # A link with a space in its path, which CommonMark writes as %20, names a file only when the file is there. So a
+  # link to the page that canon makes of a file, like <./allocating land.html>, stays as it's written.
+  deps = [d for d in dependencies(self.source, self.value) if !occursin(' ', string(d)) || ispath(path * d)]
   nodes = (Compilable(path * dep) for dep in deps)
   Map{FSPath,Compilable}(map(kv->kv[1]=>kv[2], zip(deps, nodes))...)
 end
 
 dependencies(x) = Cons{FSPath}()
 dependencies(file, object) = dependencies(object)
-dependencies((;path)::Directory, files) = begin
+dependencies((;path)::AbstractDirectory, files) = begin
   patterns = getignores(path)
   convert(Cons{FSPath}, (FSPath(f.name) for f in files if !shouldignore(f, patterns)))
 end
 
 function dependencies(c::DOM.Container)
   deps = reduce(c.attrs, init=Cons{FSPath}()) do out, (k, v)
-    k in (:href, :src) && return isrelative(v) ? push(out, FSPath(v)) : out
+    k in (:href, :src) && return isrelative(unescaped(v)) ? push(out, FSPath(unescaped(v))) : out
     k == :style && return cat(out, style_dependencies(v))
     out
   end
@@ -98,6 +101,23 @@ function dependencies(c::DOM.Container{:style})
 end
 
 isrelative(url) = occursin(relative_path, url)
+
+"""
+`url` with each %-code as the character that it stands for. CommonMark writes a
+space in a link as %20, as in `[a review](<../Book Reviews/Red Plenty.md>)`,
+and the file's name has the space.
+"""
+unescaped(url::AbstractString) = begin
+  occursin('%', url) || return url
+  bytes = UInt8[]
+  i, from = 1, codeunits(url)
+  while i <= length(from)
+    n = from[i] == UInt8('%') && i + 2 <= length(from) ? tryparse(UInt8, String(from[i+1:i+2]), base=16) : nothing
+    n === nothing ? (push!(bytes, from[i]); i += 1) : (push!(bytes, n); i += 3)
+  end
+  out = String(bytes)
+  isvalid(out) ? out : String(url)
+end
 
 struct MarkdownDocument
   meta::Dict
@@ -276,7 +296,7 @@ Base.show(io::IO, M::MIME"text/html", md::MarkdownDocument) = show(io, M, md.con
 readin((;path)::File{:md}) = parsemd(read(path, String))
 readin((;path)::File{:jl}) = cd(()->Kip.eval_module(string(path)), path.parent)
 readin((;path)::File) = read(path)
-readin((;path)::Directory) = readdir(path)
+readin((;path)::AbstractDirectory) = readdir(path)
 
 readin(file::File{:review}) = begin
   (;meta, content) = parsemd(read(file.path, String))
@@ -295,6 +315,31 @@ struct BookReview
   rating::Int8
   pubDate::Date
   content::DOM.Node
+end
+
+"""
+A folder of book reviews: each Markdown file in it is a review, as a file that
+ends in `.review` is. Its Readme, and an `index.md`, aren't reviews. A folder
+is one when its `.ladder` page, which gives Ladder the folder's kind, names
+Ladder's kind for it, as Book Reviews/.ladder does:
+
+    ```julia
+    Ladder.BookReviewDirectory
+    ```
+"""
+@def struct BookReviewDirectory <: AbstractDirectory end
+
+"True when the folder at `path` has a `.ladder` page that makes it a folder of book reviews"
+isreviews(path::FSPath) = begin
+  page = string(path * ".ladder")
+  isfile(page) && occursin(r"\bBookReviewDirectory\b", read(page, String))
+end
+
+FS.kind(::Directory, path::FSPath) = get(() -> isreviews(path) ? BookReviewDirectory : Directory, FS.kinds, path)
+
+FS.child(d::BookReviewDirectory, name::AbstractString) = begin
+  o = invoke(FS.child, Tuple{AbstractDirectory,AbstractString}, d, name)
+  o isa File{:md} && !occursin(r"^(readme|index)\.md$"i, name) ? File{:review}(o.path, d) : o
 end
 
 getignores(dir::FSPath) = begin
