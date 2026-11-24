@@ -47,6 +47,7 @@ mktempdir() do dir
   page = String(files["essay/index.html"])
   @test occursin("A folder&#39;s own page", page) || occursin("A folder's own page", page)
   @test !occursin("class=\"listing\"", page)
+  @test occursin("<title>essay</title>", page)
   @test files["essay/picture.png"] == UInt8[1, 2, 3]
   @test !haskey(files, "essay/unused.bin")
   @test String(files["essay/index.md"]) == "# A folder's own page\n\n![](./picture.png)\n"

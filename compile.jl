@@ -409,12 +409,17 @@ function todocument(file, object)
   object isa DOM.Container{:html} && return object
   @dom[:html
     [:head
-      [:title splitext(file.path.name)[1]]
+      [:title pagetitle(file)]
       page_head...
       need(DOM.css[])
       [:style paper_css]
       [:script sidenotes_js]]
     [:body html(object)]]
+end
+
+"A page's title: its file's name, or the folder's name for the folder's own page (its index.md)"
+pagetitle(file) = let name = splitext(file.path.name)[1]
+  lowercase(name) == "index" ? file.path.parent.name : name
 end
 
 compiled_type(_) = MIME("text/html")
