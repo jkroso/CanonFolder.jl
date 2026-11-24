@@ -36,3 +36,19 @@ mktempdir() do dir
   @test startswith(String(files["Sub folder/index.md"]), "+++\ndescription=\"Inside\"\n+++\n\n| Name |")
   @test !any(endswith(".md"), keys(untar(compile(FSPath(dir)))))
 end
+
+# A folder with its own index.md is that page, with no list to replace it
+mktempdir() do dir
+  mkdir(joinpath(dir, "essay"))
+  write(joinpath(dir, "essay", "index.md"), "# A folder's own page\n\n![](./picture.png)\n")
+  write(joinpath(dir, "essay", "picture.png"), UInt8[1, 2, 3])
+  write(joinpath(dir, "essay", "unused.bin"), UInt8[4])
+  files = untar(compile(FSPath(dir), markdown=true))
+  page = String(files["essay/index.html"])
+  @test occursin("A folder&#39;s own page", page) || occursin("A folder's own page", page)
+  @test !occursin("class=\"listing\"", page)
+  @test files["essay/picture.png"] == UInt8[1, 2, 3]
+  @test !haskey(files, "essay/unused.bin")
+  @test String(files["essay/index.md"]) == "# A folder's own page\n\n![](./picture.png)\n"
+  @test occursin("href=\"essay/index.html\"", String(files["index.html"]))
+end

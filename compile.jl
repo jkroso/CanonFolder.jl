@@ -261,6 +261,8 @@ compile(path::FSPath; kwargs...) = invokelatest(compile, Compilable(path); kwarg
 compile(io::IO, c::Compilable) = compile(io, c.source, c.value, c.dependencies)
 
 function compile(io::IO, dir::Directory, children, deps)
+  page = ownpage(deps)
+  isnothing(page) || return compile(subctx(io, page.source), page)
   i = findfirst(x->occursin(r"readme\..+"i, x), map(field"name", children))
   readme = if !isnothing(i)
     @dom[:section class="preface" html(deps[FSPath(children[i].name)].value)]
@@ -288,6 +290,17 @@ function markdown_page(dir::Directory, children, deps)
           for (path, entry) in deps if !shouldignore(path, ignores)]
   table = join(["| Name | Description | Created | Modified |", "|---|---|---|---|", rows...], '\n')
   convert(Vector{UInt8}, codeunits(isempty(readme) ? table * '\n' : string(readme, "\n\n", table, '\n')))
+end
+
+"""
+The file of a folder that canon makes into the folder's own index.html, such as an index.md, or nothing. A folder with
+one is shown as that page, and gets no list, which would replace it
+"""
+function ownpage(deps)
+  for (path, entry) in deps
+    occursin(r"^index\."i, path.name) && !isdir(entry.source) && pagelink(path, entry) == "index.html" && return entry
+  end
+  nothing
 end
 
 "Where the page that canon makes of `entry` is, from its folder"
