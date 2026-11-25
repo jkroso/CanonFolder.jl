@@ -112,6 +112,7 @@ mktempdir() do top
     # The bytes of a .glb file, with what the page gives it after them
     view(sums) = vcat(Vector{UInt8}("glTF"), zeros(UInt8, 16), Vector{UInt8}(string(sums["watts"])))
     """)
+  write(joinpath(pages, "design.sc"), "the bytes of a SolidCraft design")
   write(joinpath(pages, "sums.md"), """
     ---
     title: Sums on a page
@@ -167,6 +168,9 @@ mktempdir() do top
   # The view of the design can't go on the site, so the columns have one column left, and are no columns
   @test !occursin("class=\"columns\"", page) && occursin("<model-viewer class=\"view\" src=\"model.glb\"", page)
   @test String(files["model.glb"][21:end]) == "2000.0"   # 2kW, in SI units
+  # The files that the views name go beside the page as they are, for Ladder to show, but they get no page
+  @test files["model.jl"] == read(joinpath(pages, "model.jl")) && files["design.sc"] == read(joinpath(pages, "design.sc"))
+  @test !haskey(files, "model.html") && !haskey(files, "design.html")
   @test occursin("model-viewer.min.js", page) && !occursin("mermaid.esm", page)
   @test occursin("Prices and <em>watts</em>", String(files["index.html"]))
   # Any other page is CommonMark's, as before

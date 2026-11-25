@@ -10,7 +10,8 @@
 #   - A `mermaid` block is a diagram, which the browser draws with Mermaid.
 #   - A `columns` block puts the blocks after it side by side.
 #   - A `view` block of a Julia file shows what the file's function `view` makes of the page's sums. The bytes of a
-#     .glb file show as a model that the mouse turns. A view of a picture shows the picture.
+#     .glb file show as a model that the mouse turns. A view of a picture shows the picture. The file that a view
+#     names goes beside the page as it is, so that Ladder, which reads the page's Markdown from the site, shows it.
 #   - Formulas between $ and $$ go in as MathML, a callout like > [!NOTE] is a note in a box, and the footnotes go in
 #     the margin, as on the rest of the site.
 #
@@ -369,7 +370,8 @@ const PICTURES = (".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".avif")
 """
 The `view` block that opens on line `s`, as HTML. A view of a Julia file shows what its function `view` makes of the
 page's sums. A view of a picture shows the picture, and a view of a web page shows the page. Anything else, like a
-SolidCraft design, can't be shown on the site, so the block shows nothing.
+SolidCraft design, can't be shown on the site, so the block shows nothing. The file that the block names goes beside
+the page as it is, at the same place from the page, so that Ladder, which reads the page's Markdown, shows it.
 """
 view_html(p::Page, s::Int) = begin
   lines = filter(l -> !isempty(strip(l)), block_lines(p, s))
@@ -380,6 +382,7 @@ view_html(p::Page, s::Int) = begin
   shape = aspect === nothing ? "aspect-ratio: 16 / 9" : "aspect-ratio: $(aspect[1]) / $(aspect[2])"
   occursin(r"^https?://", target) && return "<iframe class=\"view\" src=\"$(escape(target))\" style=\"$shape\"></iframe>"
   file = joinpath(dirname(p.path), target)
+  beside(target) && isfile(file) && (p.files[target] = read(file))
   if lowercase(splitext(target)[2]) in PICTURES && isfile(file)
     p.files[basename(file)] = read(file)
     return "<p><img src=\"$(escape(basename(file)))\" alt=\"\"></p>"
@@ -397,6 +400,9 @@ view_html(p::Page, s::Int) = begin
   @info "The view of $target on line $s of $(basename(p.path)) can't go on the web, so the page leaves it out"
   ""
 end
+
+"True when the name `target` of a view's file is in the page's folder, or a folder in it, so that it can go beside the page"
+beside(target::AbstractString) = !isabspath(target) && !startswith(target, "~") && !any(==(".."), splitpath(target))
 
 "True when `bytes` are a .glb file: a 3D model in the binary form of glTF"
 isglb(bytes) = length(bytes) >= 20 && bytes[1:4] == codeunits("glTF")
