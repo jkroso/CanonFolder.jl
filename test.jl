@@ -176,3 +176,47 @@ mktempdir() do top
   # Any other page is CommonMark's, as before
   @test !occursin("class=\"sum", String(files["plain.html"]))
 end
+
+# A site's feed lists each page that a folder's list shows, apart from drafts, newest first, at the page's address on
+# the site. A page is dated by the first commit that has it out of hidden folders and not as a draft, or else by when it
+# was saved. Each page's head links to the feed, for a feed reader that's given the address of a page to find it.
+mktempdir() do dir
+  write(joinpath(dir, "feed.jl"), "@use \"$(joinpath(@dirname, "rss"))\" SiteFeed\nSiteFeed(\"A site\", \"https://example.com/\", \"Words\")\n")
+  write(joinpath(dir, "Old essay.md"), "+++\ndescription = \"The *first* one\"\n+++\n\nText.\n")
+  write(joinpath(dir, "Finished.md"), "+++\ncomplete = false\n+++\n\nNot done yet.\n")
+  write(joinpath(dir, "Why?.md"), "+++\ncomplete = false\n+++\n\nNot done.\n")
+  write(joinpath(dir, "Unlisted.md"), "On no folder's list.\n")
+  write(joinpath(dir, ".canonignore"), "Unlisted.md\n")
+  mkpath(joinpath(dir, ".Hidden"))
+  write(joinpath(dir, ".Hidden", "Secret.md"), "Hidden for now, and moved out later.\n")
+  mkpath(joinpath(dir, "Sub folder", "piece"))
+  write(joinpath(dir, "Sub folder", "Readme.md"), "+++\ndescription = \"Inside\"\n+++\n")
+  write(joinpath(dir, "Sub folder", "Later.md"), "Hi there\n\nThe first paragraph of three words & a [link](https://example.com/x).[^1]\n\n[^1]: A note.\n")
+  write(joinpath(dir, "Sub folder", "piece", "index.md"), "A piece made of several files.\n")
+  write(joinpath(dir, "Sub folder", "picture.png"), UInt8[1, 2, 3])
+  git(args...; time) = run(addenv(`git -C $dir -c user.name=test -c user.email=test@example.com $args`,
+                                  "GIT_AUTHOR_DATE" => time, "GIT_COMMITTER_DATE" => time), devnull, devnull)
+  git("init", "-q"; time="2020-01-01T00:00:00Z")
+  git("add", "-A"; time="2020-01-01T00:00:00Z")
+  git("commit", "-q", "-m", "first"; time="2020-01-01T00:00:00Z")
+  write(joinpath(dir, "Finished.md"), "Done now.\n")
+  git("mv", ".Hidden/Secret.md", "Moved.md"; time="2021-06-01T12:00:00Z")
+  git("commit", "-q", "-am", "second"; time="2021-06-01T12:00:00Z")
+  write(joinpath(dir, "New.md"), "Not in a commit yet.\n")
+  files = untar(compile(FSPath(dir)))
+  feed = String(files["feed.rss"])
+  items = Dict(m[1] => m[2] for m in eachmatch(r"<item><title>([^<]*)</title>(.*?)</item>"s, feed))
+  @test sort(collect(keys(items))) == ["Finished", "Later", "Moved", "New", "Old essay", "piece"]
+  @test startswith(feed, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rss version=\"2.0\" xmlns:atom=\"http://www.w3.org/2005/Atom\"><channel><title>A site</title><link>https://example.com</link>")
+  @test occursin(r"<atom:link [^>]*href=\"https://example.com/feed.rss\"", feed)
+  @test match(r"<item><title>([^<]*)</title>", feed)[1] == "New"
+  @test occursin("<link>https://example.com/Sub%20folder/Later.html</link><guid isPermaLink=\"true\">https://example.com/Sub%20folder/Later.html</guid>", items["Later"])
+  @test occursin("<link>https://example.com/Sub%20folder/piece/</link>", items["piece"])
+  @test occursin("<description>The first one</description><pubDate>Wed, 01 Jan 2020 00:00:00 GMT</pubDate>", items["Old essay"])
+  @test occursin("<description>The first paragraph of three words &amp; a link.</description>", items["Later"])
+  @test occursin("<pubDate>Tue, 01 Jun 2021 12:00:00 GMT</pubDate>", items["Finished"])
+  @test occursin("<pubDate>Tue, 01 Jun 2021 12:00:00 GMT</pubDate>", items["Moved"])
+  @test occursin(r"<link [^>]*href=\"feed.rss\"[^>]*>", files["index.html"] |> String)
+  @test occursin(r"<link [^>]*href=\"../feed.rss\" rel=\"alternate\" type=\"application/rss\+xml\"/>", files["Sub folder/Later.html"] |> String)
+  @test occursin(r"<link [^>]*href=\"../../feed.rss\"[^>]*>", files["Sub folder/piece/index.html"] |> String)
+end

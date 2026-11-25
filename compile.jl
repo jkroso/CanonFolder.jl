@@ -287,15 +287,31 @@ end
 
 # With `markdown`, each page made from Markdown also goes out as that Markdown, and each folder as a Markdown list, so
 # a server can send them to a reader that asks for Markdown
+#
+# `:root` is the folder at the top of the site, which a feed lists the pages of, and `:feed` is the path of the feed
+# there, which each page's head links to
 function compile(c::Compilable; tracker="", followlinks=true, basedir=dirname(c.source), markdown=false)
+  root = c.source.path == basedir ? c : Compilable(basedir)
   io = IOContext(TarBuffer(), :tracker => tracker,
                               :seen => Set{RelativePath}(),
                               :followlinks => followlinks,
                               :basedir => basedir,
                               :markdown => markdown,
-                              :currentdir => relpath(basedir, c.source.path))
+                              :currentdir => relpath(basedir, dirname(c.source)), # as subctx gives it
+                              :root => root,
+                              :feed => findfeed(root))
   compile(io, c.source, c.value, c.dependencies)
   io
+end
+
+"The path of the site's feed, a file at the top of the site that canon makes into RSS, or nothing"
+findfeed(root::Compilable) = begin
+  isdir(root.source) || return nothing
+  for (path, entry) in root.dependencies
+    isdir(entry.source) && continue
+    invokelatest(compiled_type, entry.source, entry.value) == MIME("application/rss+xml") && return pagelink(path, entry)
+  end
+  nothing
 end
 
 # must use invokelatest because loading in the Compilable probably defined some new methods in the process
@@ -316,6 +332,7 @@ function compile(io::IO, dir::AbstractDirectory, children, deps)
     body]
   dom = compile_dependencies(subctx(io, dir), dom, deps)
   insert_tracker!(dom, io)
+  insert_feedlink!(dom, io)
   writefile(io, dir, MIME("text/html"), dom)
   get(io, :markdown, false) && writefile(io.io, relpath(io[:basedir], dir.path) * "index.md", markdown_page(dir, children, deps))
 end
@@ -448,9 +465,10 @@ html(md::MarkdownDocument) = @dom[:article class="essay" md.content]
 
 function compile(io::IO, file::Union{File{:jl},File{:md},File{:review}}, obj, deps)
   mime = invokelatest(compiled_type, file, obj)
-  doc = invokelatest(todocument, file, obj)
+  doc = invokelatest(todocument, io, file, obj)
   doc = compile_dependencies(subctx(io, file), doc, deps)
   insert_tracker!(doc, io)
+  insert_feedlink!(doc, io)
   writefile(io, file, mime, doc)
   writesource(io, file)
   writefiles(io, file, obj)
@@ -470,6 +488,9 @@ writesource(io::IOContext{TarBuffer}, file::Union{File{:md},File{:review}}) =
 subctx(io, fs::FSObject) = IOContext(io, :currentdir => relpath(io[:basedir], dirname(fs)))
 
 compile(io::IO, file::File, data::Vector{UInt8}, deps) = writefile(io, file, mime_type(file), data) # just passes through unchanged
+
+"The document of `object`, the value of `file`. A value that needs the rest of the site, like a feed, takes `io` too"
+todocument(io::IO, file, object) = todocument(file, object)
 
 function todocument(file, object)
   object isa DOM.Container{:html} && return object
@@ -582,6 +603,21 @@ function html(review::BookReview)
       [:span class="year" format(review.pubDate, dateformat"yyyy")]]
     [:div class="standfirst" inline_md(review.description)]
     review.content]
+end
+
+"""
+Links the head of a page to the site's feed with `<link rel="alternate">`, so a feed reader that's given the address of
+any page of the site finds the feed
+"""
+insert_feedlink!(_, _) = nothing
+function insert_feedlink!(dom::DOM.Container{:html}, io::IOContext)
+  feed = get(io, :feed, nothing)
+  isnothing(feed) && return nothing
+  head = dom.children[1]
+  head isa DOM.Container{:head} || return nothing
+  depth = count(!isempty, split(string(io[:currentdir]), '/'))
+  push!(head.children, @dom[:link rel="alternate" type="application/rss+xml" href=urlpath("../"^depth * feed)])
+  nothing
 end
 
 function insert_tracker!(_, _) end
