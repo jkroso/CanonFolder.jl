@@ -334,7 +334,8 @@ chart_html(p::Page, s::Int, part::Real) = begin
     @warn "A chart of $(basename(p.path)) has nothing to draw" line=s problem=d.problem
     return ""
   end
-  tall = c.kind == :pie ? PIE_H : PLOT_H
+  # Bars and lines get more room for the names of their axes, so the plot stays as tall
+  tall = (c.kind == :pie ? PIE_H : PLOT_H) + Charts.axis_room(d, c.kind)
   # A phone shows a picture laid out for a narrow page, with its words as big as the wide one's
   pictures = [chart_svg(d, c.kind, max(WIDE * part, NARROW), tall, "wide"), chart_svg(d, c.kind, NARROW, tall, "narrow")]
   title = isempty(c.title) ? "" : "<figcaption>$(escape(c.title))</figcaption>\n"

@@ -164,6 +164,10 @@ mktempdir() do top
   @test occursin(r"<th>Triple</th><td><code>watts \* 3</code></td><td class=\"result\">6,?000W|6kW", page)
   @test occursin("<figcaption>What the parts cost</figcaption>", page)
   @test occursin("<svg class=\"wide\"", page) && occursin("<svg class=\"narrow\"", page) && occursin("30 USD", page)
+  # The column that names the bars is under them, and the one column drawn is at the top of its numbers. The picture is
+  # taller by both, so the bars have as much room as before.
+  @test occursin(">Part</text>", page) && occursin(">Cost</text>", page)
+  @test occursin(r"<svg class=\"narrow\"[^>]* viewBox=\"0 0 360 296\"", page)
   @test occursin("class=\"footnote-ref\"", page) && occursin("<div class=\"footnote-def\" id=\"fn-a\"><p>A note.</p></div>", page)
   # The view of the design can't go on the site, so the columns have one column left, and are no columns
   @test !occursin("class=\"columns\"", page) && occursin("<model-viewer class=\"view\" src=\"model.glb\"", page)
