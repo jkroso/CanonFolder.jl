@@ -22,9 +22,9 @@
 
 @use "../Ladder/markdown" Kind Line classify spans tablecells isdivider front_matter
 @use "../Ladder/html" html escape
-@use "../Ladder/sheet" tally cases shown units parts ident Given SHEET folded
-@use "../Ladder/chart" => Charts
-@use "../Ladder/columns" => Columns
+@use "../Ladder/blocks/sheet" tally cases shown units parts ident Given SHEET folded
+@use "../Ladder/blocks/chart" => Charts
+@use "../Ladder/blocks/columns" => Columns
 @use "github.com/jkroso/Units.jl" => Units
 @use "github.com/jkroso/Units.jl/Money" => Cash
 @use "github.com/jkroso/JSON.jl/read"
